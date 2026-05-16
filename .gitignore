@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 .DS_Store
 node_modules/
+rag-eval/eval_results.csv
