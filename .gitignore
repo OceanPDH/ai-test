@@ -1,8 +1,13 @@
 venv/
+.venv/
 __pycache__/
 .pytest_cache/
 .env
 *.pyc
 .DS_Store
 node_modules/
+.claude/
+reports/*.json
+reports/*.md
+!reports/.gitkeep
 rag-eval/eval_results.csv

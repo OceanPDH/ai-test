@@ -23,6 +23,10 @@ import sys
 
 # 验证环境变量
 if not os.environ.get("OPENAI_API_KEY"):
+    if "pytest" in sys.modules:
+        import pytest
+
+        pytest.skip("OPENAI_API_KEY is required for DeepSeek judge demos", allow_module_level=True)
     print("❌ 请先设置 OPENAI_API_KEY")
     print("   export OPENAI_API_KEY='你的deepseek-key'")
     sys.exit(1)
