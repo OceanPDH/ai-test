@@ -1,0 +1,8 @@
+{
+  "page": "boundary_probe",
+  "requestedSn": "PO-211-99999999999999999-D01",
+  "category": "nonexistent",
+  "hasVO": false,
+  "leaksRealSn": false,
+  "redirected": false
+}
