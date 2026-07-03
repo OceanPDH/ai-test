@@ -1,0 +1,15 @@
+{
+  "page": "order_detail",
+  "orderSn": "PO-211-18828955848953659",
+  "orderStatus": {
+    "orderStatusPrompt": "Refunded",
+    "orderId": "PO-211-18828955848953659"
+  },
+  "parentStatus": 6,
+  "afterSales": [
+    {
+      "statusPrompt": "Refund issued for 1 canceled item",
+      "parentAfterSalesSn": "PO-211-18828955848953659-D01"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "page": "refund_detail",
+  "parentAfterSalesSn": "PO-211-03195296431993659-D01",
+  "refundMethodNote": null,
+  "isEstimate": false,
+  "totalReturnCreditAmount": 0,
+  "methods": [
+    {
+      "refundMethod": "Mastercard ...9199",
+      "refundMethodType": 1,
+      "arn": null,
+      "refundMethodAmount": "0.19",
+      "refundAmountNationalPrice": {
+        "price": 19,
+        "cur": "USD",
+        "priceStr": "0.19"
+      }
+    }
+  ],
+  "amountBreakdown": [
+    {
+      "key": "Amount you paid for the refund items:",
+      "value": "$0.19",
+      "typeCode": 0
+    },
+    {
+      "key": "Item(s) total:",
+      "value": "$0.24",
+      "typeCode": 1
+    },
+    {
+      "key": "Coupon applied:",
+      "value": "-$0.07",
+      "typeCode": 2
+    },
+    {
+      "key": "Shipping:",
+      "value": "FREE",
+      "typeCode": 3
+    },
+    {
+      "key": "Tax:",
+      "value": "$0.02",
+      "typeCode": 4
+    }
+  ]
+}

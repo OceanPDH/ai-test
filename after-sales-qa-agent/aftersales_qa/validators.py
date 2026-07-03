@@ -57,13 +57,15 @@ def v_field_completeness(bundle) -> list[Finding]:
     if not r:
         return out
     methods = r.get("methods") or []
+    # ARN 不作为硬性必填：取消退款(canceled item)等场景本就无 ARN，
+    # 缺 ARN 交由 refund.arn_format 出 WARN，避免误判为 FAIL。
     ok_methods = bool(methods) and all(
-        m.get("arn") and m.get("refundMethod") and m.get("refundMethodAmount") is not None
+        m.get("refundMethod") and m.get("refundMethodAmount") is not None
         for m in methods
     )
     out.append(Finding(
         "refund.field_completeness", ok_methods, "error", sn,
-        "退款方式含 arn/方式/金额" if ok_methods else "退款方式缺少 arn/方式/金额字段",
+        "退款方式含 方式/金额" if ok_methods else "退款方式缺少 方式/金额字段",
         {"methodCount": len(methods)},
     ))
     breakdown = r.get("amountBreakdown") or []
