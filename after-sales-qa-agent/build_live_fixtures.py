@@ -90,7 +90,11 @@ def main():
         (LIVE / f"order_{order_sn}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=2))
     for r in REFUNDS:
         (LIVE / f"refund_{r['parentAfterSalesSn']}.json").write_text(json.dumps(r, ensure_ascii=False, indent=2))
-    print(f"wrote {len(ORDERS)} orders + {len(REFUNDS)} refunds → {LIVE}")
+    # list.json：extractList() 在列表页产出的每单状态（本账号 10 单均 Refunded），
+    # 用于 list_vs_order.status 跨页一致性校验。
+    listing = [{"orderSn": order_sn, "status": "Refunded"} for order_sn, _ in ORDERS]
+    (LIVE / "list.json").write_text(json.dumps(listing, ensure_ascii=False, indent=2))
+    print(f"wrote {len(ORDERS)} orders + {len(REFUNDS)} refunds + list.json → {LIVE}")
 
 
 if __name__ == "__main__":

@@ -16,8 +16,13 @@ from typing import Optional
 
 from .money import parse_money, fmt_cents
 
-# 售后详情金额明细里，typeCode==0 是"实退金额"，>=1 是构成实退的各明细行
+# 售后详情金额明细里，typeCode==0 是"实退金额"
 PAID_TYPECODE = 0
+# 已观测到的、构成实退金额的加性明细行类型：
+# 1=Item(s) total, 2=Coupon applied, 3=Shipping, 4=Tax。
+# 出现白名单外的 typeCode 时不静默计入，而是显式告警交人工确认，
+# 避免非加性信息行（原价/积分等）被误当加项导致勾稽假失败。
+ADDITIVE_TYPECODES = {1, 2, 3, 4}
 
 # 已知合法的订单状态文案（列表页/详情页共用），用于枚举校验
 KNOWN_STATUSES = {
@@ -84,29 +89,57 @@ def v_amount_reconciliation(bundle) -> list[Finding]:
         return out
     paid = None
     line_items = []
+    incomplete = False   # 出现未知类型或无法解析的加项 → 勾稽不完整，避免误判 FAIL
     for row in r.get("amountBreakdown") or []:
+        tc = row.get("typeCode")
         cents = parse_money(row.get("value"))
-        if row.get("typeCode") == PAID_TYPECODE:
+        if tc == PAID_TYPECODE:
             paid = cents
-        elif cents is not None:
-            line_items.append(cents)
+        elif tc in ADDITIVE_TYPECODES:
+            if cents is None:
+                incomplete = True
+                out.append(Finding(
+                    "refund.breakdown_parse", False, "warn", sn,
+                    f"明细行金额无法解析，未纳入勾稽：{row.get('key')!r}={row.get('value')!r}",
+                ))
+            else:
+                line_items.append(cents)
+        else:
+            # 白名单外的 typeCode：不计入求和，显式告警交人工确认
+            incomplete = True
+            out.append(Finding(
+                "refund.unknown_breakdown_type", False, "warn", sn,
+                f"未知明细类型 typeCode={tc}（{row.get('key')!r}），未纳入勾稽，请人工确认",
+            ))
 
     if paid is None or not line_items:
         out.append(Finding(
             "refund.amount_reconciliation", False, "error", sn,
-            "无法定位实退金额或明细行，跳过勾稽",
+            "无法定位实退金额或可勾稽明细，跳过勾稽",
         ))
         return out
 
     items_sum = sum(line_items)
-    ok_break = items_sum == paid
-    out.append(Finding(
-        "refund.amount_reconciliation", ok_break, "error", sn,
-        (f"明细勾稽通过：Σ明细 {fmt_cents(items_sum)} = 实退 {fmt_cents(paid)}"
-         if ok_break else
-         f"明细勾稽失败：Σ明细 {fmt_cents(items_sum)} ≠ 实退 {fmt_cents(paid)}"),
-        {"itemsSum": items_sum, "paid": paid},
-    ))
+    matched = items_sum == paid
+    if matched:
+        out.append(Finding(
+            "refund.amount_reconciliation", True, "error", sn,
+            f"明细勾稽通过：Σ明细 {fmt_cents(items_sum)} = 实退 {fmt_cents(paid)}",
+            {"itemsSum": items_sum, "paid": paid},
+        ))
+    elif incomplete:
+        # 有未纳入的行，不能断言是缺陷；降级为告警
+        out.append(Finding(
+            "refund.amount_reconciliation", False, "warn", sn,
+            f"含未纳入明细，勾稽不完整：Σ已知明细 {fmt_cents(items_sum)} ≠ 实退 {fmt_cents(paid)}，请人工确认",
+            {"itemsSum": items_sum, "paid": paid},
+        ))
+    else:
+        out.append(Finding(
+            "refund.amount_reconciliation", False, "error", sn,
+            f"明细勾稽失败：Σ明细 {fmt_cents(items_sum)} ≠ 实退 {fmt_cents(paid)}",
+            {"itemsSum": items_sum, "paid": paid},
+        ))
 
     methods_sum = sum(
         (parse_money(m.get("refundMethodAmount")) or 0) for m in (r.get("methods") or [])
@@ -119,16 +152,17 @@ def v_amount_reconciliation(bundle) -> list[Finding]:
          f"退款方式合计 {fmt_cents(methods_sum)} ≠ 实退 {fmt_cents(paid)}"),
     ))
 
-    # 国币价交叉核对（refundAmountNationalPrice.price 已是分）
+    # 国币价交叉核对：用格式化串 priceStr 解析，避免对 price 原始整数做 ×100 假设
+    # （零位小数币种如 JPY/KRW 的 price 非"分"，priceStr 才是可比的展示金额）
     for m in (r.get("methods") or []):
-        nat = (m.get("refundAmountNationalPrice") or {}).get("price")
+        nat_cents = parse_money((m.get("refundAmountNationalPrice") or {}).get("priceStr"))
         amt = parse_money(m.get("refundMethodAmount"))
-        if nat is not None and amt is not None:
+        if nat_cents is not None and amt is not None:
             out.append(Finding(
-                "refund.national_price_matches", nat == amt, "warn", sn,
-                (f"国币价 {nat}¢ = 方式金额 {amt}¢"
-                 if nat == amt else
-                 f"国币价 {nat}¢ ≠ 方式金额 {amt}¢"),
+                "refund.national_price_matches", nat_cents == amt, "warn", sn,
+                (f"国币价 {fmt_cents(nat_cents)} = 方式金额 {fmt_cents(amt)}"
+                 if nat_cents == amt else
+                 f"国币价 {fmt_cents(nat_cents)} ≠ 方式金额 {fmt_cents(amt)}"),
             ))
     return out
 

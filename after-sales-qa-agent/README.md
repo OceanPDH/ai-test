@@ -26,8 +26,11 @@ Python/裸 fetch 直接调会被拒（`403 request illegal`）。而页面是 **
 ## 校验项（P1）
 
 - `refund.field_completeness` 退款方式/金额/明细字段完整
-- `refund.amount_reconciliation` **金额勾稽**：Σ明细 = 实退 = 退款方式合计（硬指标）
-- `refund.national_price_matches` 国币价 = 方式金额
+- `refund.amount_reconciliation` **金额勾稽**：Σ明细 = 实退 = 退款方式合计（硬指标）。
+  只对已知加性 typeCode（1 item/2 coupon/3 shipping/4 tax）求和；出现未知或无法解析
+  的明细行时降级为 WARN"勾稽不完整"，避免把非加性信息行误判为失败
+- `refund.unknown_breakdown_type` / `refund.breakdown_parse` 未知/不可解析明细行显式告警
+- `refund.national_price_matches` 国币价 = 方式金额（用 `priceStr` 比对，不假设币种小数位）
 - `refund.arn_format` ARN 纯数字、长度合理
 - `refund.sn_rule` 售后单号符合 订单号+-D0x
 - `order.status_known` / `list_vs_order.status` / `order_links_refund` 跨页状态一致 & 三页打通
