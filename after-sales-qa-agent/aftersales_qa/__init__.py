@@ -4,7 +4,7 @@
 本包只负责纯代码的确定性断言与报告，不触网、不烧 token。
 """
 
-from .validators import Finding, run_all
+from .validators import Finding, run_all, run_boundary
 from .report import render_report
 
-__all__ = ["Finding", "run_all", "render_report"]
+__all__ = ["Finding", "run_all", "run_boundary", "render_report"]

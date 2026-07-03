@@ -205,6 +205,42 @@ def v_status_consistency(bundle) -> list[Finding]:
     return out
 
 
+def v_boundary_failsafe(record) -> list[Finding]:
+    """越权/边界探针：非法/不存在/越界单号必须 fail-safe——空数据、不泄露、不串单。
+
+    record 由浏览器边界探针产出：
+        {page:'boundary_probe', requestedSn, category, hasVO, leaksRealSn, redirected}
+    """
+    sn = record.get("requestedSn") or "<tampered>"
+    out = [
+        Finding(
+            "boundary.no_data_leak", not record.get("leaksRealSn"), "error", sn,
+            "未泄露任何真实订单数据" if not record.get("leaksRealSn")
+            else "⚠️ 非法单号竟泄露了真实订单数据（越权风险）",
+        ),
+        Finding(
+            "boundary.no_unexpected_redirect", not record.get("redirected"), "error", sn,
+            "无意外重定向" if not record.get("redirected")
+            else "⚠️ 非法单号被重定向到其它订单",
+        ),
+        Finding(
+            "boundary.fail_safe_empty", not record.get("hasVO"), "warn", sn,
+            f"非法单号返回空(fail-safe)：{record.get('category')}" if not record.get("hasVO")
+            else "⚠️ 非法单号竟渲染出售后数据",
+        ),
+    ]
+    return out
+
+
+def run_boundary(record) -> list[Finding]:
+    try:
+        return v_boundary_failsafe(record)
+    except Exception as e:
+        return [Finding("boundary.crashed", False, "error",
+                        record.get("requestedSn", "<tampered>"),
+                        f"边界校验异常：{type(e).__name__}: {e}")]
+
+
 ALL_VALIDATORS = [
     v_field_completeness,
     v_amount_reconciliation,

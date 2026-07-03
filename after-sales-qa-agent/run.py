@@ -20,13 +20,14 @@ import json
 import sys
 from pathlib import Path
 
-from aftersales_qa import run_all
+from aftersales_qa import run_all, run_boundary
 from aftersales_qa.report import render_console, render_report, summarize
 
 
 def load_case(case_dir: Path):
     orders, refunds = {}, {}
     list_entries = {}
+    boundary = []
     for p in sorted(case_dir.glob("*.json")):
         data = json.loads(p.read_text(encoding="utf-8"))
         if p.name == "list.json":
@@ -37,7 +38,9 @@ def load_case(case_dir: Path):
             orders[data.get("orderSn")] = data
         elif p.name.startswith("refund_"):
             refunds[data.get("parentAfterSalesSn")] = data
-    return orders, refunds, list_entries
+        elif p.name.startswith("boundary_"):
+            boundary.append(data)
+    return orders, refunds, list_entries, boundary
 
 
 def build_bundles(orders, refunds, list_entries):
@@ -72,15 +75,17 @@ def main(argv=None):
         print(f"目录不存在：{case_dir}", file=sys.stderr)
         return 2
 
-    orders, refunds, list_entries = load_case(case_dir)
+    orders, refunds, list_entries, boundary = load_case(case_dir)
     bundles = build_bundles(orders, refunds, list_entries)
-    if not bundles:
-        print("未在目录里配出任何 (订单, 售后) bundle。", file=sys.stderr)
+    if not bundles and not boundary:
+        print("未在目录里配出任何 (订单, 售后) bundle 或边界探针。", file=sys.stderr)
         return 2
 
     all_findings = []
     for b in bundles:
         all_findings.extend(run_all(b))
+    for probe in boundary:
+        all_findings.extend(run_boundary(probe))
 
     print(render_console(all_findings))
     if args.md:

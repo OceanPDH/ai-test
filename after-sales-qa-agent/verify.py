@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-from aftersales_qa import run_all
+from aftersales_qa import run_all, run_boundary
 from aftersales_qa.report import render_console, summarize
 
 ROOT = Path(__file__).parent
@@ -53,12 +53,35 @@ def check_broken_is_caught() -> bool:
     return caught
 
 
+def check_boundary_leak_is_caught() -> bool:
+    """模拟一个"越权漏洞"页面：非法单号却渲染出真实订单数据。
+    边界校验器必须把 no_data_leak 判失败——证明它能真的抓到越权。"""
+    vulnerable = {
+        "page": "boundary_probe",
+        "requestedSn": "PO-211-99999999999999999-D01",
+        "category": "nonexistent",
+        "hasVO": True,               # 漏洞：非法单号竟有数据
+        "leaksRealSn": True,         # 漏洞：泄露了真实单号
+        "redirected": False,
+    }
+    findings = run_boundary(vulnerable)
+    leak = [f for f in findings if f.check == "boundary.no_data_leak"]
+    caught = bool(leak) and all(not f.ok for f in leak)
+    print("── 模拟越权漏洞（非法单号却泄露真实数据）──")
+    for f in findings:
+        if not f.ok:
+            print(f"  抓到：[{f.check}] {f.message}")
+    print(f"\n预期：no_data_leak 判失败。实际：{'已抓到 ✅' if caught else '未抓到 ❌'}\n")
+    return caught
+
+
 def main() -> int:
     ok1 = check_golden()
     ok2 = check_broken_is_caught()
+    ok3 = check_boundary_leak_is_caught()
     print("=" * 48)
-    if ok1 and ok2:
-        print("verify: PASS ✅ 校验层对真实单全过，且能抓到注入缺陷。")
+    if ok1 and ok2 and ok3:
+        print("verify: PASS ✅ 真实单全过；能抓到金额缺陷；能抓到越权泄露。")
         return 0
     print("verify: FAIL ❌ 见上方明细。")
     return 1

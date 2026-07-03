@@ -1,0 +1,8 @@
+{
+  "page": "boundary_probe",
+  "requestedSn": "DROP-TABLE-x'--",
+  "category": "malformed",
+  "hasVO": false,
+  "leaksRealSn": false,
+  "redirected": false
+}

@@ -32,7 +32,17 @@ Python/裸 fetch 直接调会被拒（`403 request illegal`）。而页面是 **
 - `refund.sn_rule` 售后单号符合 订单号+-D0x
 - `order.status_known` / `list_vs_order.status` / `order_links_refund` 跨页状态一致 & 三页打通
 
-> 越权/边界（篡改 SN 看是否泄露他人数据）需浏览器实操，作为 P1 之后的一条用例接入。
+### 越权/边界（boundary probe）
+
+篡改 `parent_after_sales_sn`（不存在 / 越界后缀 / 畸形输入），断言页面 **fail-safe**：
+
+- `boundary.no_data_leak` 非法单号不得泄露任何真实订单数据（越权风险）
+- `boundary.no_unexpected_redirect` 不被静默重定向到其它订单
+- `boundary.fail_safe_empty` 非法单号返回空
+
+> 实测结论：三类非法输入均安全 fail-safe（空数据、不泄露、不崩溃、不串单）；
+> 唯一 UX 瑕疵是空白页而非友好"未找到"提示。探针见 `extractor/extract.js` 的
+> `extractBoundaryProbe()`；读取前需等页面加载 ~1s，否则会读到 bfcache 残留。
 
 ## 用法
 
@@ -46,6 +56,9 @@ python3 run.py fixtures/golden --md report.md
 
 `fixtures/golden/` 是你账号里真实的 $0.49 退款单（订单详情 + 售后详情），作为黄金基准。
 `fixtures/broken/` 是把 Coupon 篡改为 `-$4.00` 的注入缺陷版，用于验证"校验器能抓错"。
+`fixtures/live/` 是全量抽取的 10 个真实售后单；`fixtures/boundary/` 是 3 类越权/边界探针的真实观测。
+
+`verify.py` 三重自证：真实单全过 · 抓到金额缺陷 · 抓到（模拟的）越权泄露。
 
 ## 目录
 
