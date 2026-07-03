@@ -27,10 +27,20 @@ const KNOWN_STATUSES = [
 // 从订单号 span 向上爬找卡片，在卡片子树内取状态叶子——顶部筛选 tab 不是订单号的
 // 祖先，因此天然被排除。
 function extractList() {
+  const SN_RE = /^PO-\d{3}-\d{10,}$/;
   const isStatusLeaf = (el) =>
     KNOWN_STATUSES.includes((el.textContent || '').trim()) && el.querySelector('*') === null;
+  // 统计子树内"不同"的订单号数量：同一卡片里订单号常渲染多个 span（显示+复制等），
+  // 按 span 计数会误判越界，故按去重后的 SN 值计数。
+  const distinctSnInSubtree = (root) =>
+    new Set(
+      [...root.querySelectorAll('span')]
+        .map((s) => (s.textContent || '').trim())
+        .filter((t) => SN_RE.test(t))
+    ).size;
+
   const snSpans = [...document.querySelectorAll('span')].filter((e) =>
-    /^PO-\d{3}-\d{10,}$/.test((e.textContent || '').trim())
+    SN_RE.test((e.textContent || '').trim())
   );
   const seen = new Set();
   const out = [];
@@ -43,10 +53,19 @@ function extractList() {
     for (let i = 0; i < 10 && card; i++) {
       card = card.parentElement;
       if (!card) break;
+      // 越过单卡边界（祖先含 >1 个不同订单号）就停：宁可 status=null 也不串到邻单
+      if (distinctSnInSubtree(card) > 1) break;
       const hit = [...card.querySelectorAll('*')].find(isStatusLeaf);
       if (hit) { status = hit.textContent.trim(); break; }
     }
     out.push({ orderSn: sn, status });
+  }
+  // 回退：若精确 span 匹配一无所获（DOM 结构变了），退回 body 文本枚举订单号
+  if (out.length === 0) {
+    const ids = [...new Set(
+      [...(document.body.innerText || '').matchAll(/PO-\d{3}-\d{10,}/g)].map((m) => m[0])
+    )];
+    return ids.map((sn) => ({ orderSn: sn, status: null }));
   }
   return out;
 }
